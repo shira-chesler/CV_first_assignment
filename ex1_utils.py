@@ -8,6 +8,8 @@
          ########: ##:::. ##::'######:
         ........::..:::::..:::......::
 """
+
+import math
 from typing import List
 
 import numpy as np
@@ -132,6 +134,9 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
         :param nIter: Number of optimization loops
         :return: (List[qImage_i],List[error_i])
     """
+    if nQuant >= 256:
+        return imOrig
+
     is_rgb = False
     if len(imOrig.shape) == 3 and imOrig.shape[2] == 3:
         # means that the image has a third dimension - RGB representation
@@ -144,28 +149,95 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
 
     qImage_i = []
     error_i = []
-    z = np.array(nQuant+1)
-    q = np.array(nQuant)
+    # z = np.zeros(nQuant + 1)
+    # # q = np.array(nQuant)
 
     not_norm_arr = stretch_back(arr1)  # changes values of image to be in range (0, 255)
     histogram, bin_edges = np.histogram(not_norm_arr, bins=256, range=(0, 256))
+    histogram = histogram.reshape(256, 1)
+    bin_edges = bin_edges[:256].reshape(256, 1)
+    # print(histogram.shape)
+    # print(bin_edges.shape)
+
+    if np.count_nonzero(histogram) <= nQuant:
+        return imOrig
+
+    num_of_pixels = imOrig.shape[0] * imOrig.shape[1]
+    np_initial_seg = num_of_pixels / nQuant
+    z = initial_borders(histogram, np_initial_seg, nQuant + 1)
+
+    for i in range(0, nIter):
+        q = getWeightedMean(bin_edges, histogram, z)
+        z = getNewBorders(q)
+        # print("means",q)
+        # print("borders", z)
+        new_image = apply_quant(q, z, np.copy(not_norm_arr))
+        # sec_new_img = gpt_apply_quant(q, z, not_norm_arr.copy())
+        # print(np.array_equal(sec_new_img, new_image))
+        mse = calc_mse(not_norm_arr, new_image, num_of_pixels)
+        error_i.append(mse)
+        if is_rgb:
+            tmp = transformRGB2YIQ(stretch_back(imOrig))
+            tmp[:, :, 0] = new_image
+            new_image = transformYIQ2RGB(tmp)
+        qImage_i.append(normalize(new_image))
+        # print(error_i)
+        if mse == 0 or (len(error_i) > 2 and mse in error_i):  # converges
+            if mse in error_i:
+                if len(error_i) > 2 and mse in error_i:
+                    indices = np.where(error_i == mse)[0]
+                    for idx in indices:
+                        if np.array_equal(qImage_i[idx], new_image):
+                            break
+            else:
+                break
+
+    return qImage_i, error_i
 
 
-    #if nQuant>=256:
-     #   return
+def getWeightedMean(intense: np.ndarray, pixels_in_intense: np.ndarray, borders: np.ndarray) -> np.ndarray:
+    means = np.ndarray(len(borders) - 1)
+    borders = np.copy(borders)
+    borders = np.array(list(map(math.ceil, borders)))
+    for i in range(0, len(borders) - 1):
+        val = np.dot(intense[borders[i]:borders[i + 1]].T, pixels_in_intense[borders[i]:borders[i + 1]])
+        n_pixels = pixels_in_intense[borders[i]:borders[i + 1]].sum()
+        means[i] = val / n_pixels
+        # val = 0
+        # for j in range(len(intense[borders[i]:borders[i + 1]])):
+        #     val += (intense[borders[i]:borders[i + 1]])[j] * (pixels_in_intense[borders[i]:borders[i + 1]])[j]
+        # print(val / ((pixels_in_intense[borders[i]:borders[i + 1]]).sum()) == means[i])
+        # print("val:", val / pixels_in_intense[borders[i]:borders[i + 1]].sum(), "mean: ", means[i])
+
+    return means
 
 
+def getNewBorders(seg_values: np.ndarray) -> np.ndarray:
+    shift = np.roll(seg_values, 1)
+    # print("shift:", shift)
+    # print("orig:", seg_values)
+    new_borders = (shift + seg_values) / 2
+    new_borders[0] = 0
+    new_borders = np.append(new_borders, 255)
+    # print("new borders:", new_borders)
+    return new_borders
 
 
+def apply_quant(values: np.ndarray, borders: np.ndarray, org_im: np.ndarray) -> np.ndarray:
+    for i in range(0, len(values)):
+        # print(org_im.shape)
+        org_im[(org_im >= borders[i]) & (org_im <= borders[i + 1])] = values[i]
+        # org_im = np.where((org_im >= borders[i]) and (org_im <= borders[i + 1]), values[i], org_im)
+    return org_im
 
 
+def gpt_apply_quant(values: np.ndarray, borders: np.ndarray, org_im: np.ndarray) -> np.ndarray:
+    org_im[np.logical_and(org_im >= borders[:-1], org_im <= borders[1:])] = values[np.arange(len(values))]
+    return org_im
 
 
-
-
-def getWeightedMean_simple(intense: np.ndarray, cell_values: np.ndarray) -> int:
-    val = np.dot(intense, cell_values)
-    return val / cell_values.sum()
+def calc_mse(orgarr: np.ndarray, quantarr: np.ndarray, n_pixels: int) -> int:
+    return ((orgarr - quantarr) ** 2).sum() / n_pixels
 
 
 def normalize(arr: np.ndarray) -> np.ndarray:
@@ -177,9 +249,25 @@ def stretch_back(arr: np.ndarray) -> np.ndarray:
     return arr * 255
 
 
+def initial_borders(histogram: np.ndarray, np_initial_seg: int, num_of_borders: int) -> np.ndarray:
+    borders = np.ndarray(num_of_borders)
+    borders[0] = 0
+    borders[num_of_borders - 1] = 255
+    tmp = 0
+    border_num = 1
+    for i in range(0, 256):
+        if tmp + histogram[i, 0] >= np_initial_seg:
+            borders[border_num] = i
+            border_num += 1
+            tmp = 0
+            continue
+        tmp += histogram[i]
+    return borders
+
+
 if __name__ == '__main__':
     img = imReadAndConvert("beach.jpg", 2)
-    hsitogramEqualize(img)
-    plt.figure()
-    plt.imshow(img)
-    plt.show()
+    quantizeImage(img, 3, 9)
+    # plt.figure()
+    # plt.imshow(img)
+    # plt.show()
