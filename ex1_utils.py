@@ -100,15 +100,7 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
         :param imgOrig: Original Histogram
         :return (imgEq,histOrg,histEQ)
     """
-    is_rgb = False
-    if len(imgOrig.shape) == 3 and imgOrig.shape[2] == 3:
-        # means that the image has a third dimension - RGB representation
-        arr1 = transformRGB2YIQ(imgOrig)[:, :, 0]
-        is_rgb = True
-    elif len(imgOrig.shape) == 2:
-        arr1 = imgOrig
-    else:
-        raise Exception("The array got is not a proper RGB/GRAY_SCALE image!")
+    arr1, is_rgb = image_type_check(imgOrig)
 
     not_norm_arr = stretch_back(arr1)  # changes values of image to be in range (0, 255)
     histogram, bin_edges = np.histogram(not_norm_arr, bins=256, range=(0, 256))
@@ -137,15 +129,7 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
     if nQuant >= 256:
         return imOrig
 
-    is_rgb = False
-    if len(imOrig.shape) == 3 and imOrig.shape[2] == 3:
-        # means that the image has a third dimension - RGB representation
-        arr1 = transformRGB2YIQ(imOrig)[:, :, 0]
-        is_rgb = True
-    elif len(imOrig.shape) == 2:
-        arr1 = imOrig
-    else:
-        raise Exception("The array got is not a proper RGB/GRAY_SCALE image!")
+    arr1, is_rgb = image_type_check(imOrig)
 
     qImage_i = []
     error_i = []
@@ -193,6 +177,19 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
                 break
 
     return qImage_i, error_i
+
+
+def image_type_check(imOrig: np.ndarray) -> (np.ndarray, bool):
+    is_rgb = False
+    if len(imOrig.shape) == 3 and imOrig.shape[2] == 3:
+        # means that the image has a third dimension - RGB representation
+        arr1 = transformRGB2YIQ(imOrig)[:, :, 0]
+        is_rgb = True
+    elif len(imOrig.shape) == 2:
+        arr1 = imOrig
+    else:
+        raise Exception("The array got is not a proper RGB/GRAY_SCALE image!")
+    return arr1, is_rgb
 
 
 def getWeightedMean(intense: np.ndarray, pixels_in_intense: np.ndarray, borders: np.ndarray) -> np.ndarray:
@@ -249,16 +246,43 @@ def stretch_back(arr: np.ndarray) -> np.ndarray:
     return arr * 255
 
 
-def initial_borders(histogram: np.ndarray, np_initial_seg: int, num_of_borders: int) -> np.ndarray:
-    borders = np.ndarray(num_of_borders)
+def initial_borders(histogram: np.ndarray, np_initial_seg: int, num_of_borders: int) -> np.array:
+    borders = np.zeros(num_of_borders, dtype=int)
+    sum_pixels_in_each_seg = np.zeros(num_of_borders - 1, dtype=int)
+    bool_dont_get_to_initial = np.zeros(num_of_borders - 1, dtype=bool)
     borders[0] = 0
     borders[num_of_borders - 1] = 255
     tmp = 0
     border_num = 1
+    in_while_true = False
     for i in range(0, 256):
+        while True:
+            if np.count_nonzero(histogram[borders[border_num - 1]:]) < (len(borders) - border_num - 1):
+                in_while_true = True
+                borders[border_num - 1] = i - 2
+                bool_dont_get_to_initial[border_num - 1] = True
+                sum_pixels_in_each_seg[border_num - 1] -= histogram[i - 1]
+                i = i - 2
+                if sum_pixels_in_each_seg[border_num - 1] <= 0:  # can't be bellow zero
+                    border_num -= 1
+                    i = borders[border_num - 1]
+                    continue
+            break
+        if in_while_true:
+            in_while_true = False
+            continue
+        if bool_dont_get_to_initial[border_num - 1] and tmp > 0:
+            borders[border_num] = i
+            bool_dont_get_to_initial[border_num - 1] = False
+            border_num += 1
+            sum_pixels_in_each_seg[border_num - 2] = tmp
+            tmp = 0
+            continue
         if tmp + histogram[i, 0] >= np_initial_seg:
             borders[border_num] = i
+            bool_dont_get_to_initial[border_num - 1] = False
             border_num += 1
+            sum_pixels_in_each_seg[border_num - 2] = tmp
             tmp = 0
             continue
         tmp += histogram[i]
