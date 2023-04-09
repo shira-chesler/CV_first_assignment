@@ -9,7 +9,7 @@
         ........::..:::::..:::......::
 """
 
-import math
+
 from typing import List
 
 import numpy as np
@@ -38,14 +38,16 @@ def imReadAndConvert(filename: str, representation: int) -> np.ndarray:
     :param representation: GRAY_SCALE or RGB
     :return: The image object
     """
-    img = cv2.imread(filename)
-    if representation == 1:
-        image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    elif representation == 2:
-        image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    else:  # if gets wrong representation, does RGB cause it includes gray scale
-        print("Got a wrong mode, converting to RGB")
-        image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    image = cv2.imread(filename)
+    while True:
+        if representation == 1:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        elif representation == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            representation = int(input("Got wrong mode, please renter - 1 or 2"))
+            continue
+        break
     arr_im = np.array(image).astype(np.float64)
     arr_norm = normalize(arr_im)
     return arr_norm
@@ -192,13 +194,12 @@ def image_type_check(imOrig: np.ndarray) -> (np.ndarray, bool):
     return arr1, is_rgb
 
 
-def getWeightedMean(intense: np.ndarray, pixels_in_intense: np.ndarray, borders: np.ndarray) -> np.ndarray:
-    means = np.ndarray(len(borders) - 1)
-    borders = np.copy(borders)
-    borders = np.array(list(map(math.ceil, borders)))
+def getWeightedMean(intensity: np.ndarray, pixels_in_intensity: np.ndarray, borders: np.ndarray) -> np.ndarray:
+    means = np.empty(len(borders) - 1)
+    borders = np.ceil(borders).astype(int)
     for i in range(0, len(borders) - 1):
-        val = np.dot(intense[borders[i]:borders[i + 1]].T, pixels_in_intense[borders[i]:borders[i + 1]])
-        n_pixels = pixels_in_intense[borders[i]:borders[i + 1]].sum()
+        val = np.dot(intensity[borders[i]:borders[i + 1]].T, pixels_in_intensity[borders[i]:borders[i + 1]])
+        n_pixels = pixels_in_intensity[borders[i]:borders[i + 1]].sum()
         means[i] = val / n_pixels
         # val = 0
         # for j in range(len(intense[borders[i]:borders[i + 1]])):
