@@ -3,13 +3,13 @@
 I used Python version 3.9 and PyCharm platform to test my
 program. 
 
-###The files I'm submitting are:
+### The files I'm submitting are:
 * ex1_main.py - The main given by lecturer in order to test the program.
 * gamma.py - The file with the gamma correction GUI slider
 * ex1_utils - The file with the rest of the functions
 * bac_con.png, beach.jpg, dark.jpg, water_bear.png, testImg1.jpg, testImg2.jpg - images that can be used to test the code on.
 
-###The functions I've written with a short description of each:
+### The functions I've written with a short description of each:
 inside ex1_utils:
 * myID - Return my ID.
 * imReadAndConvert - Reads an image, and returns the image converted as requested.
