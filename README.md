@@ -7,7 +7,7 @@ program.
 * ex1_main.py - The main given by lecturer in order to test the program.
 * gamma.py - The file with the gamma correction GUI slider
 * ex1_utils - The file with the rest of the functions
-* bac_con.png, beach.jpg, dark.jpg, water_bear.png, goku.png, doggy.jpg - images that can be used to test the code on.
+* bac_con.png, beach.jpg, dark.jpg, water_bear.png, testImg1.jpg, testImg2.jpg - images that can be used to test the code on.
 
 ###The functions I've written with a short description of each:
 inside ex1_utils:
