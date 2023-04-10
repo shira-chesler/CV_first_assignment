@@ -1,15 +1,14 @@
-# """
-#         '########:'##::::'##::::'##:::
-#          ##.....::. ##::'##:::'####:::
-#          ##::::::::. ##'##::::.. ##:::
-#          ######:::::. ###::::::: ##:::
-#          ##...:::::: ## ##:::::: ##:::
-#          ##:::::::: ##:. ##::::: ##:::
-#          ########: ##:::. ##::'######:
-#         ........::..:::::..:::......::
-# """
-# from __future__ import division
-# from __future__ import print_function
+"""
+        '########:'##::::'##::::'##:::
+         ##.....::. ##::'##:::'####:::
+         ##::::::::. ##'##::::.. ##:::
+         ######:::::. ###::::::: ##:::
+         ##...:::::: ## ##:::::: ##:::
+         ##:::::::: ##:. ##::::: ##:::
+         ########: ##:::. ##::'######:
+        ........::..:::::..:::......::
+"""
+
 
 import numpy as np
 
@@ -22,16 +21,26 @@ title_window = 'Gamma Correction'
 
 
 def nothing(x):
+    """
+    A function that does nothing (necessary for track bar)
+    :param x: the location that the track bar sends to the function
+    """
     pass
 
 
 def apply_power(image: np.ndarray, power: float) -> np.ndarray:
+    """
+    The function applies a wanted power to an numpy ndarray representation of an image
+    :param image: numpy nd array representation of the image we want to apply the power to
+    :param power: the gamma power we need to apply to the image
+    :return: an np ndarray representation of the image with the power applied to it
+    """
     return np.power(image, power)
 
 
 def imReadAndConvert(filename: str, representation: int) -> np.ndarray:
     """
-    Reads an image, and returns the image converted as requested
+    Reads an image, and returns the image converted as requested (but RGB as BGR)
     :param filename: The path to the image
     :param representation: GRAY_SCALE or RGB
     :return: The image object
@@ -77,9 +86,10 @@ def gammaDisplay(img_path: str, rep: int):
         if k == 27:
             break
 
-        # get current positions of all Three trackbars
+        # get current positions of the trackbar
         val = cv2.getTrackbarPos(trackbar_name, title_window)
 
+        # apply gamma power according to track bar position
         new = apply_power(src, val * 0.01)
 
     cv2.waitKey()
